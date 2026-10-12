@@ -1,0 +1,55 @@
+name: Sync upstream daily
+
+"on":
+  schedule:
+    # 05:17 UTC = 09:17 Asia/Dubai; GitHub may delay scheduled runs.
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'ccrrfftt/rea'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ccrrfftt/rea
+    steps:
+      - name: Merge upstream main and verify ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="$(gh api "repos/${GH_REPO}" --jq '.parent.full_name')"
+          if [[ "$parent" != "morluto/rea" ]]; then
+            echo "Unexpected upstream; refusing to synchronize." >&2
+            exit 1
+          fi
+
+          upstream_sha="$(gh api repos/morluto/rea/commits/main --jq '.sha')"
+          before_sha="$(gh api "repos/${GH_REPO}/commits/main" --jq '.sha')"
+
+          # GitHub merges upstream and refuses conflicts; never force-reset main.
+          gh api --method POST "repos/${GH_REPO}/merge-upstream" \
+            -f branch=main --jq '.message'
+
+          after_sha="$(gh api "repos/${GH_REPO}/commits/main" --jq '.sha')"
+          status="$(gh api "repos/${GH_REPO}/compare/${upstream_sha}...${after_sha}" --jq '.status')"
+          if [[ "$status" != "ahead" && "$status" != "identical" ]]; then
+            echo "Upstream commit is missing after synchronization: $status" >&2
+            exit 1
+          fi
+
+          {
+            echo '### Upstream synchronization succeeded'
+            echo "- Upstream: morluto/rea main at ${upstream_sha}"
+            echo "- Before: ${before_sha}"
+            echo "- After: ${after_sha}"
+            echo '- Local fork changes were preserved; no force push was used.'
+          } >> "$GITHUB_STEP_SUMMARY"
