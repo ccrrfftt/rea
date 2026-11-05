@@ -249,6 +249,11 @@ Generated fixtures and manifests remain ignored.
 
 ## Maintainer release checklist
 
+In `ccrrfftt/rea`, merge a PR that updates the version in `package.json` and
+the matching `CHANGELOG.md` entry to publish a GitHub Release. The fork uses
+`v<VERSION>` tags and attaches the installable CLI tarball and its SHA-256
+checksum. The upstream registry workflow below runs only in `morluto/rea`.
+
 Use the [release guide](docs/releasing.md). Main pushes automatically refresh a
 Release Please PR with the next version and changelog. Review its migration
 notes, wait for the current CI checks to pass, and merge it into main to publish.
